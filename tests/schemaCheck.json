@@ -1,0 +1,8 @@
+{
+    "colorOutput":"1",
+    "profiles":{
+        "a":{"host":"localhost","username":"root","password":"pass","database":"schemaCheck_a","port":"3306","engine":"mysql"},
+        "b":{"host":"localhost","username":"root","password":"pass","database":"schemaCheck_b","port":"3306","engine":"mysql"}
+    },
+    "sync_phpmyadmin_erd":"0"
+}

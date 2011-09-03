@@ -1,3 +1,4 @@
+#/usr/bin/env php
 <?php
 /**
  * @todo see if the script can detect column renames, instead of just drop and add. 
@@ -39,6 +40,20 @@ class consoleColors{
 		else	
 			return '';
 	} 
+	static public function red( $string ) {
+		return self::setColor( 'red' ).$string.self::resetColor();
+	}
+	static public function __callStatic( $method, $string ) {
+		try{
+			$x = self::setColor( $method );
+			foreach( $string as $s )
+				$x .= $s;
+			$x .= self::resetColor();
+			return $x;
+		}catch( Exception $e ) {
+			return implode( "", $string );
+		}
+	}
 }
 class MySQLDatabaseSchema extends consoleColors implements databaseSchema{
 	static public $doColor = true; 
@@ -56,7 +71,6 @@ class MySQLDatabaseSchema extends consoleColors implements databaseSchema{
 		$this->dsn .= "host=$this->host";
 		if( !empty( $databaseinfo->port ) )
 			$this->dsn .= ";port=".$databaseinfo->port;
-		print "\n".$this->dsn."\n";
 		$this->connection = new PDO( $this->dsn, $databaseinfo->username, $databaseinfo->password );
 		$statement = $this->connection->prepare( "SELECT * FROM information_schema.`CHARACTER_SETS`" );
 		$statement->execute();
@@ -213,7 +227,7 @@ class MySQLDatabaseSchema extends consoleColors implements databaseSchema{
 					$sql .= "ALTER TABLE `$tableName` CHANGE `$column` `$column` {$columnInfo['Type'] }";
 					if( $columnInfo['Null'] == 'NO' )
 						$sql .= " NOT NULL";
-					$sql .= self::eol;
+					$sql .= ";" . self::eol;
 				}
 			}else{
 				//create alter for missing column
@@ -237,6 +251,9 @@ class MySQLDatabaseSchema extends consoleColors implements databaseSchema{
 		if( !empty( $sql ) ) {
 			$sql = self::eol . self::setColor('grey') . "#schema changes for $tableName" . self::eol . self::setColor( 'gold' ) . $sql . self::resetColor();
 		}
+		else{
+			// $sql = self::eol . self::setColor('grey') . "#no changes for $tableName";
+		}
 		return $sql;
 	}
 	public function hasTable( $tableName ) {
@@ -244,7 +261,7 @@ class MySQLDatabaseSchema extends consoleColors implements databaseSchema{
 	}
 	public function exportDropTable( $tableName ) {
 		$sql  = self::setColor( 'red' );
-		$sql .= self::eol."#DROP TABLE `$tableName`;".self::eol;
+		$sql .= self::eol."DROP TABLE `$tableName`;".self::eol;
 		$sql .= self::resetColor();
 		return $sql;
 	}
@@ -321,9 +338,9 @@ class schemaChecker {
 		}
 		$sql = trim( $sql );
 		if( empty( $sql ) )
-			echo "#no schema changes \n";
+			return "#no schema changes \n";
 		else
-			echo $sql . "\n";
+			return $sql . "\n";
 	}
 	public function exportPHPMyAdminERD() {
 		return $this->a->exportPHPMyAdminERD( $this->b );
@@ -367,6 +384,7 @@ class profile{
 }
 class hasJSONConfigFile {
 	public $config = null;
+	protected $configFilePath = null;
 	public function __construct() {
 		$this->loadConfig();
 	}
@@ -385,16 +403,19 @@ class hasJSONConfigFile {
 		file_put_contents( $this->getFilePath(), json_encode( $this->config ) );
 	}
 	private function getFilePath() {
-		return "/home/".get_current_user()."/.schemaCheck.json";
+		if( empty( $this->configFilePath ) )
+			return "/home/".get_current_user()."/.schemaCheck.json";
+		else
+			return $this->configFilePath;
 	}
 }
 class App extends hasJSONConfigFile {
 	public function __construct() {
 		parent::__construct();
 		$argv = $GLOBALS['argv'];
-		if( count( $argv ) !== 3 ) {
+		if( count( $argv ) < 3 ) {
 			print "\n";
-			print "php schemaCheck.php sourceProfile targetProfile \n";
+			print "usage:\nphp schemaCheck.php sourceProfile targetProfile [--nocolor]\n";
 			print "===============================================\n";
 			exit(0);
 		}
@@ -405,11 +426,14 @@ class App extends hasJSONConfigFile {
 		if( !isset( $this->config->profiles->$target ) )
 			die( "Target profile does not exist\n" );
 		$schemaChecker = new schemaChecker( $this->config->profiles->$source, $this->config->profiles->$target );
-		if( isset( $this->config->colorOutput ) )
+		if( in_array( '--nocolor', $argv ) ) {
+			consoleColors::$doColor = false;
+		}else if( isset( $this->config->colorOutput ) )
 			consoleColors::$doColor = $this->config->colorOutput == '1';
 		print $schemaChecker->checkSchema();
 		if( $this->config->sync_phpmyadmin_erd == '1' )
 			print $schemaChecker->exportPHPMyAdminERD();
 	}
 }
-$app = new App();
+if( !defined('_DONT_EXECUTE') )
+	$app = new App();
