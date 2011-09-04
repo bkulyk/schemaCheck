@@ -412,25 +412,40 @@ class hasJSONConfigFile {
 class App extends hasJSONConfigFile {
 	public function __construct() {
 		parent::__construct();
+		
+		//get command line arguments
 		$argv = $GLOBALS['argv'];
+		
+		//print useage statement if necessacary
 		if( count( $argv ) < 3 ) {
 			print "\n";
 			print "usage:\nphp schemaCheck.php sourceProfile targetProfile [--nocolor]\n";
 			print "===============================================\n";
 			exit(0);
 		}
+		
 		$source = $argv[1];
 		$target = $argv[2];
+		
+		//get the database profiles
 		if( !isset( $this->config->profiles->$source ) )
 			die( "Source profile does not exist\n" );
 		if( !isset( $this->config->profiles->$target ) )
 			die( "Target profile does not exist\n" );
-		$schemaChecker = new schemaChecker( $this->config->profiles->$source, $this->config->profiles->$target );
+
+		//initialize the schema checker
+		list( $a, $b ) = array( $this->config->profiles->$source, $this->config->profiles->$target );
+		$schemaChecker = new schemaChecker( $a, $b );
+
+		//output the sql in a different color for each type of statement or not.
 		if( in_array( '--nocolor', $argv ) ) {
 			consoleColors::$doColor = false;
 		}else if( isset( $this->config->colorOutput ) )
 			consoleColors::$doColor = $this->config->colorOutput == '1';
+		
+		//print the schema change sql statements to the console.
 		print $schemaChecker->checkSchema();
+
 		if( $this->config->sync_phpmyadmin_erd == '1' )
 			print $schemaChecker->exportPHPMyAdminERD();
 	}
